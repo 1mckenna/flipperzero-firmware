@@ -72,3 +72,9 @@ bool subghz_protocol_decoder_secplus_v1_deserialize(void* context, FlipperFormat
  * @param output Resulting text
  */
 void subghz_protocol_decoder_secplus_v1_get_string(void* context, string_t output);
+
+void* subghz_protocol_encoder_secplus_v1_alloc(SubGhzEnvironment* environment);
+void subghz_protocol_encoder_secplus_v1_free(void* context);
+void subghz_protocol_encoder_secplus_v1_stop(void* context);
+LevelDuration subghz_protocol_encoder_secplus_v1_yield(void* context);
+bool subghz_protocol_encoder_secplus_v1_deserialize(void* context, FlipperFormat* flipper_format);
