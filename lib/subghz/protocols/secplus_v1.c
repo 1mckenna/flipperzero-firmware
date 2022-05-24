@@ -100,7 +100,7 @@ void* subghz_protocol_encoder_secplus_v1_alloc(SubGhzEnvironment* environment) {
     instance->generic.protocol_name = instance->base.protocol->name;
     //ADD STUFF HERE
     instance->encoder.repeat = 4;
-    instance->encoder.size_upload = 80; //max 40bit*2
+    instance->encoder.size_upload = 86; //max 40bit*2
     instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
     instance->encoder.is_runing = false;
     return instance;
@@ -144,7 +144,7 @@ LevelDuration subghz_protocol_encoder_secplus_v1_yield(void* context) {
 static bool subghz_protocol_encoder_secplus_v1_get_upload(SubGhzProtocolEncoderSecPlus_v1* instance) {
     furi_assert(instance);
     size_t index = 0;
-    size_t size_upload = 80;//80
+    size_t size_upload = 86;//80
     uint32_t rolling = instance->generic.data & 0xFFFFFFFF;
     uint32_t fixed = (instance->generic.data >> 32) & 0xFFFFFFFF;
     
@@ -154,11 +154,9 @@ static bool subghz_protocol_encoder_secplus_v1_get_upload(SubGhzProtocolEncoderS
     } else {
         instance->encoder.size_upload = size_upload;
     }
+    FURI_LOG_I(TAG,"subghz_protocol_encoder_secplus_v1_get_upload\n");
     rolling = subghz_protocol_blocks_reverse_key(rolling, 32);
     rolling = rolling + 12;
-    FURI_LOG_I(TAG,"Rolling Code(+12): %u\n",rolling);
-    FURI_LOG_I(TAG,"Fixed Code: %u\n",fixed);
-
     uint32_t rolling_base3[20] = { 0 };
     uint32_t fixed_base3[20] = { 0 };
 
@@ -171,50 +169,54 @@ static bool subghz_protocol_encoder_secplus_v1_get_upload(SubGhzProtocolEncoderS
     }
     uint32_t code[40] = { 0 };
     uint32_t acc = 0;
+    int codeCount = 0;
     for(int i=0;i<20;i++)
     {
-        if((i == 0) || (i==10))
+        if( i == 10 )
             acc = 0;
         acc = acc + rolling_base3[i];
-        code[i] = rolling_base3[i];
+        code[codeCount] = rolling_base3[i];
+        codeCount++;
         acc = acc + fixed_base3[i];
-        code[i+1] = acc % 3;
+        code[codeCount] = acc % 3;
+        codeCount++;
     }
-
+    // To-Do FIX BELOW
     //Play 0 to signify start of 1st frame
-    instance->encoder.upload[index++] = level_duration_make(false, subghz_protocol_secplus_v1_const.te_long);
-    instance->encoder.upload[index++] = level_duration_make(true, subghz_protocol_secplus_v1_const.te_short);
+    instance->encoder.upload[index++] = level_duration_make(false, (uint32_t)subghz_protocol_secplus_v1_const.te_long);
+    instance->encoder.upload[index++] = level_duration_make(true, (uint32_t)subghz_protocol_secplus_v1_const.te_short);
     for(int i = 0; i < 40; i++)
     {
-        FURI_LOG_I(TAG,"%u",code[i]);
         if(i == 20)
         {
-            // instance->encoder.upload[index++] = level_duration_wait() subghz_protocol_secplus_v1_const.te_short *58);;//29ms of silence occurs after each frame
-            osDelay(29);
+            instance->encoder.upload[index++] = level_duration_make(false, (uint32_t)subghz_protocol_secplus_v1_const.te_short *58);;//29ms of silence occurs after each frame
+            // osDelay(29);
             //Play 2 to signify start of 2nd frame
-            instance->encoder.upload[index++] = level_duration_make(false, subghz_protocol_secplus_v1_const.te_short);
-            instance->encoder.upload[index++] = level_duration_make(true, subghz_protocol_secplus_v1_const.te_long);
+            instance->encoder.upload[index++] = level_duration_make(false, (uint32_t)subghz_protocol_secplus_v1_const.te_short);
+            instance->encoder.upload[index++] = level_duration_make(true, (uint32_t)subghz_protocol_secplus_v1_const.te_long);
         }
 
         if(code[i] == 0)
         {
-            instance->encoder.upload[index++] = level_duration_make(false, subghz_protocol_secplus_v1_const.te_long);
-            instance->encoder.upload[index++] = level_duration_make(true, subghz_protocol_secplus_v1_const.te_short);
+            instance->encoder.upload[index++] = level_duration_make(false, (uint32_t)subghz_protocol_secplus_v1_const.te_long);
+            instance->encoder.upload[index++] = level_duration_make(true, (uint32_t)subghz_protocol_secplus_v1_const.te_short);
         }
         else if(code[i] == 1)
         {
-            instance->encoder.upload[index++] = level_duration_make(false, subghz_protocol_secplus_v1_const.te_short *2);
+            instance->encoder.upload[index++] = level_duration_make(false, (uint32_t)subghz_protocol_secplus_v1_const.te_short *2);
             instance->encoder.upload[index++] = level_duration_make(true, subghz_protocol_secplus_v1_const.te_short *2);
         }
         else if(code[i] == 2)
         {
-            instance->encoder.upload[index++] = level_duration_make(false, subghz_protocol_secplus_v1_const.te_short);
-            instance->encoder.upload[index++] = level_duration_make(true, subghz_protocol_secplus_v1_const.te_long);
+            instance->encoder.upload[index++] = level_duration_make(false, (uint32_t)subghz_protocol_secplus_v1_const.te_short);
+            instance->encoder.upload[index++] = level_duration_make(true, (uint32_t)subghz_protocol_secplus_v1_const.te_long);
         }
     }
-    // instance->encoder.upload[index++] = level_duration_make(false, subghz_protocol_secplus_v1_const.te_short *58);//29ms of silence occurs after each frame//29ms of silence occurs after each frame
-    osDelay(29);
+    // osDelay(29);
+    instance->encoder.upload[index++] = level_duration_make(false, (uint32_t)subghz_protocol_secplus_v1_const.te_short *58);//29ms of silence occurs after each frame//29ms of silence occurs after each frame
+    FURI_LOG_I("Index","%d\n",index);
     FURI_LOG_I(TAG,"TX COMPLETE\n");
+
     return true;
 }
 
@@ -222,13 +224,13 @@ bool subghz_protocol_encoder_secplus_v1_deserialize(void* context, FlipperFormat
     furi_assert(context);
     SubGhzProtocolEncoderSecPlus_v1* instance = context;
     bool res = false;
+    FURI_LOG_I(TAG,"subghz_protocol_encoder_secplus_v1_deserialize\n");
     do {
         if(!subghz_block_generic_deserialize(&instance->generic, flipper_format)) {
             FURI_LOG_E(TAG, "Deserialize error");
             break;
         }
 
-        //optional parameter parameter
         flipper_format_read_uint32(
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
 
